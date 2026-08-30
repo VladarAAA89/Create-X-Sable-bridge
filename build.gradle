@@ -13,6 +13,14 @@ repositories {
     maven { url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/" }
     maven { url = "https://maven.createmod.net" }
     maven { url = "https://api.modrinth.com/maven" }
+    exclusiveContent {
+        forRepository {
+            maven { url = "https://maven.ryanhcode.dev/releases" }
+        }
+        filter {
+            includeGroup("dev.ryanhcode.sable-companion")
+        }
+    }
 }
 
 base {
@@ -128,6 +136,11 @@ dependencies {
     implementation files('libs/sable-neoforge-1.21.1-2.0.3.jar')
     implementation("dev.engine-room.flywheel:flywheel-neoforge-api-1.21.1:1.0.6")
     implementation("net.createmod.ponder:ponder-neoforge:1.0.82+mc1.21.1")
+    jarJar(api("dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:[${project.sable_companion_version},)")) {
+        version {
+            prefer(project.sable_companion_version)
+        }
+    }
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
