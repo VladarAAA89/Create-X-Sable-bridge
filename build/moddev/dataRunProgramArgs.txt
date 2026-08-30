@@ -1,0 +1,29 @@
+# Main Class
+cpw.mods.bootstraplauncher.BootstrapLauncher
+
+# NeoForge Run-Type Program Arguments
+--launchTarget
+forgedatadev
+--assetIndex
+17
+--assetsDir
+C:\\Users\\Admin_Vladik\\.gradle\\caches\\neoformruntime\\assets
+--gameDir
+.
+--fml.fmlVersion
+4.0.43
+--fml.mcVersion
+1.21.1
+--fml.neoForgeVersion
+21.1.248
+--fml.neoFormVersion
+20240808.144430
+
+# User Supplied Program Arguments
+--mod
+createsable_bridge
+--all
+--output
+C:\\Users\\Admin_Vladik\\IdeaProjects\\createsable_bridge\\src\\generated\\resources
+--existing
+C:\\Users\\Admin_Vladik\\IdeaProjects\\createsable_bridge\\src\\main\\resources

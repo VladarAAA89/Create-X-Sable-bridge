@@ -1,0 +1,5 @@
+{
+  "itemGroup.createsable_bridge": "Example Mod Tab",
+  "block.createsable_bridge.example_block": "Example Block",
+  "item.createsable_bridge.example_item": "Example Item"
+}
