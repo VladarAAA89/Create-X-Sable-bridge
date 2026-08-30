@@ -1,0 +1,177 @@
+{
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2026-08-16 15:33:31 +0300"
+    },
+    "done": true
+  },
+  "minecraft:adventure/adventuring_time": {
+    "criteria": {
+      "minecraft:plains": "2026-08-16 15:33:32 +0300"
+    },
+    "done": false
+  },
+  "create:root": {
+    "criteria": {
+      "0": "2026-08-16 15:33:42 +0300"
+    },
+    "done": true
+  },
+  "simulated:root": {
+    "criteria": {
+      "0": "2026-08-16 15:33:42 +0300"
+    },
+    "done": true
+  },
+  "aeronautics:root": {
+    "criteria": {
+      "0": "2026-08-16 15:33:42 +0300"
+    },
+    "done": true
+  },
+  "create:super_glue": {
+    "criteria": {
+      "0": "2026-08-25 18:38:04 +0300"
+    },
+    "done": true
+  },
+  "create:track_0": {
+    "criteria": {
+      "0": "2026-08-25 18:39:46 +0300"
+    },
+    "done": true
+  },
+  "powergrid:root": {
+    "criteria": {
+      "0": "2026-08-25 18:45:28 +0300"
+    },
+    "done": true
+  },
+  "create:train": {
+    "criteria": {
+      "0": "2026-08-25 18:45:58 +0300"
+    },
+    "done": true
+  },
+  "powergrid:solar_panel": {
+    "criteria": {
+      "0": "2026-08-25 18:47:18 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/vertical_generator_housing_from_conversion": {
+    "criteria": {
+      "has_item": "2026-08-25 18:49:04 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/insulated_copper_wire": {
+    "criteria": {
+      "has_item": "2026-08-25 18:49:09 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/copper_coil": {
+    "criteria": {
+      "has_item": "2026-08-25 18:49:09 +0300"
+    },
+    "done": true
+  },
+  "offroad:recipes/misc/large_tire": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:49:11 +0300"
+    },
+    "done": true
+  },
+  "simulated:recipes/misc/steering_wheel": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:49:11 +0300"
+    },
+    "done": true
+  },
+  "offroad:recipes/misc/monstrous_tire": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:49:11 +0300"
+    },
+    "done": true
+  },
+  "offroad:recipes/misc/tire": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:49:11 +0300"
+    },
+    "done": true
+  },
+  "offroad:recipes/misc/small_tire": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:49:11 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/relay_dpdt": {
+    "criteria": {
+      "has_item": "2026-08-25 18:51:04 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/relay": {
+    "criteria": {
+      "has_item": "2026-08-25 18:51:04 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/generator_vertical_commutator_from_conversion": {
+    "criteria": {
+      "has_item": "2026-08-25 18:51:29 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/current_gauge_from_conversion": {
+    "criteria": {
+      "has_item": "2026-08-25 18:51:42 +0300"
+    },
+    "done": true
+  },
+  "create:wrench_goggles": {
+    "criteria": {
+      "1": "2026-08-25 18:51:58 +0300"
+    },
+    "done": false
+  },
+  "aeronautics:recipes/misc/aviators_goggles": {
+    "criteria": {
+      "has_ingredient": "2026-08-25 18:51:58 +0300"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/chest": {
+    "criteria": {
+      "has_lots_of_items": "2026-08-25 18:52:29 +0300"
+    },
+    "done": true
+  },
+  "powergrid:circuit_board": {
+    "criteria": {
+      "0": "2026-08-25 18:54:08 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/light_bulb": {
+    "criteria": {
+      "has_item": "2026-08-25 18:54:17 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/lv_light_bulb": {
+    "criteria": {
+      "has_item": "2026-08-25 18:54:17 +0300"
+    },
+    "done": true
+  },
+  "powergrid:recipes/misc/crafting/growth_lamp": {
+    "criteria": {
+      "has_item": "2026-08-25 18:54:17 +0300"
+    },
+    "done": true
+  },
+  "DataVersion": 3955
+}
