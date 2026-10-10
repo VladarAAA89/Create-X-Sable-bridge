@@ -1,6 +1,6 @@
 package CreateSableBridge;
 
-import CreateSableBridge.bridge.MechanicalBearingBlockEntitySubLevelBridge;
+import CreateSableBridge.bridge.Bearing.MechanicalBearingBlockEntitySubLevelBridge;
 import com.simibubi.create.content.contraptions.bearing.BearingContraption;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import net.minecraft.core.BlockPos;

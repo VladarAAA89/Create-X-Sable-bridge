@@ -4,7 +4,8 @@
   "package": "CreateSableBridge.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "MixinMechanicalBearingBlockEntity"
+    "MixinMechanicalBearing",
+    "MixinLinearActuator"
   ],
   "client": [
   ],

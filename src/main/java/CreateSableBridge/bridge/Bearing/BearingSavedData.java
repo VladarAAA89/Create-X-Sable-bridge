@@ -1,4 +1,4 @@
-package CreateSableBridge.bridge;
+package CreateSableBridge.bridge.Bearing;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

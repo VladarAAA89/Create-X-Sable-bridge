@@ -1,4 +1,4 @@
-package CreateSableBridge.bridge;
+package CreateSableBridge.bridge.Bearing;
 
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration;
