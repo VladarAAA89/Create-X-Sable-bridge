@@ -2,6 +2,7 @@ package CreateSableBridge.bridge.Bearing;
 
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration;
+import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.ticket.SubLevelLoadingTicketType;
@@ -31,6 +32,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MechanicalBearingBlockEntitySubLevelBridge {
 
     private static final Map<BlockPos, UUID> activeSubLevels = new ConcurrentHashMap<>();
+
+    private static final Map<BlockPos, Double> targetAngles = new ConcurrentHashMap<>();
+    private static final double STIFFNESS = 200.0;  // стартовое значение, подбирать
+    private static final double DAMPING = 30.0;     // ≈ 2·√STIFFNESS
 
     public static UUID createBearingSubLevel(
             ServerLevel level,
@@ -94,45 +99,49 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
             applyRotaryConstraint(container, subLevel, bearingPos, rotationAxis);
         }
 
-        updateVelocity(subLevel, rotationAxis, speedRpm);
         return subLevelId;
     }
 
-    private static void applyRotaryConstraint(ServerSubLevelContainer container, ServerSubLevel subLevel, BlockPos bearingPos, Direction rotationAxis) {
-        Vector3d worldPivot = new Vector3d(bearingPos.getX() + 0.5, bearingPos.getY() + 0.5, bearingPos.getZ() + 0.5);
-        Vector3d localPivot = subLevel.logicalPose().transformPositionInverse(new Vector3d(worldPivot));
+    // поле класса. Object замени на тип, который вернёт addConstraint
+// (наведи курсор на handle ниже): он нужен для setMotor и remove
+    private static final Map<BlockPos, RotaryConstraintHandle> constraintHandles = new ConcurrentHashMap<>();
 
+    private static void applyRotaryConstraint(ServerSubLevelContainer container, ServerSubLevel subLevel,
+                                              BlockPos bearingPos, Direction facing) {
+        // 1. Пивот: центр грани подшипника, к которой крепится платформа
+        Vector3d worldPivot = new Vector3d(
+                bearingPos.getX() + 0.5 + facing.getStepX() * 0.5,
+                bearingPos.getY() + 0.5 + facing.getStepY() * 0.5,
+                bearingPos.getZ() + 0.5 + facing.getStepZ() * 0.5);
+
+        // 2. Ось вращения: всегда положительное направление
+        Direction.Axis a = facing.getAxis();
         Vector3d worldAxis = new Vector3d(
-                rotationAxis.getStepX(),
-                rotationAxis.getStepY(),
-                rotationAxis.getStepZ()
-        ).normalize();
+                a == Direction.Axis.X ? 1 : 0,
+                a == Direction.Axis.Y ? 1 : 0,
+                a == Direction.Axis.Z ? 1 : 0);
 
-        // Перевод вектора направления в локальные координаты
-        Vector3d zeroInv = subLevel.logicalPose().transformPositionInverse(new Vector3d(0, 0, 0));
-        Vector3d localAxis = subLevel.logicalPose().transformPositionInverse(new Vector3d(worldAxis)).sub(zeroInv).normalize();
+        // 3. Перевод в локальные координаты сабуровня
+        Vector3d localPivot = subLevel.logicalPose().transformPositionInverse(new Vector3d(worldPivot));
+        Vector3d localAxis = subLevel.logicalPose().transformNormalInverse(new Vector3d(worldAxis)).normalize();
 
-        RotaryConstraintConfiguration constraintConfig = new RotaryConstraintConfiguration(
-                worldPivot,
-                localPivot,
-                worldAxis,
-                localAxis
-        );
+        RotaryConstraintConfiguration config = new RotaryConstraintConfiguration(
+                worldPivot, localPivot, worldAxis, localAxis);
 
-        container.physicsSystem().getPipeline().addConstraint(null, subLevel, constraintConfig);
+        var handle = container.physicsSystem().getPipeline().addConstraint(null, subLevel, config);
+        if (handle instanceof RotaryConstraintHandle rotary) {
+            constraintHandles.put(bearingPos.immutable(), rotary);
+        }
     }
 
-    public static void updateVelocity(ServerSubLevel subLevel, Direction rotationAxis, float speedRpm) {
-        if (subLevel == null || subLevel.isRemoved()) return;
+    public static void driveBearing(BlockPos bearingPos, float speedRpm) {
+        RotaryConstraintHandle h = constraintHandles.get(bearingPos);
+        if (h == null || !h.isValid()) return;
 
-        Vector3d axisNormal = new Vector3d(
-                rotationAxis.getStepX(),
-                rotationAxis.getStepY(),
-                rotationAxis.getStepZ()
-        ).normalize();
+        double omega = speedRpm * Math.PI / 30.0;                 // рад/с
+        double target = targetAngles.merge(bearingPos, omega / 20.0, Double::sum); // тик = 1/20 с
 
-        double radPerSec = (speedRpm * Math.PI) / 30.0;
-        subLevel.latestAngularVelocity.set(axisNormal).mul(radPerSec);
+        h.setMotor(RotaryConstraintHandle.DEFAULT_AXIS, target, STIFFNESS, DAMPING, false, 0.0);
     }
 
     public static void removeBearingSubLevel(ServerLevel level, BlockPos bearingPos) {
@@ -223,21 +232,21 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         }
     }
 
-    public static void updateVelocityByPos(ServerLevel level, BlockPos bearingPos, float speedRpm) {
-        BearingSavedData savedData = BearingSavedData.get(level);
-        if (savedData == null) return;
-
-        BearingSavedData.BearingEntry entry = savedData.bearings.get(bearingPos);
-        if (entry == null) return;
-
-        ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
-        if (container == null) return;
-
-        ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.subLevelId());
-        if (subLevel != null && !subLevel.isRemoved()) {
-            updateVelocity(subLevel, entry.axis(), speedRpm);
-        }
-    }
+//    public static void updateVelocityByPos(ServerLevel level, BlockPos bearingPos, float speedRpm) {
+//        BearingSavedData savedData = BearingSavedData.get(level);
+//        if (savedData == null) return;
+//
+//        BearingSavedData.BearingEntry entry = savedData.bearings.get(bearingPos);
+//        if (entry == null) return;
+//
+//        ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
+//        if (container == null) return;
+//
+//        ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.subLevelId());
+//        if (subLevel != null && !subLevel.isRemoved()) {
+//            driveBearing(subLevel, entry.axis(), speedRpm);
+//        }
+//    }
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
@@ -266,12 +275,16 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         BearingSavedData savedData = BearingSavedData.get(level);
         if (savedData == null) return;
 
+//        for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> entry : savedData.bearings.entrySet()) {
+//            ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.getValue().subLevelId());
+//            if (subLevel != null && !subLevel.isRemoved()) {
+//                float currentSpeed = getSpeedFromBearing(level, entry.getKey());
+//                updateVelocity(subLevel, entry.getValue().axis(), currentSpeed);
+//            }
+//        }
+
         for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> entry : savedData.bearings.entrySet()) {
-            ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.getValue().subLevelId());
-            if (subLevel != null && !subLevel.isRemoved()) {
-                float currentSpeed = getSpeedFromBearing(level, entry.getKey());
-                updateVelocity(subLevel, entry.getValue().axis(), currentSpeed);
-            }
+            driveBearing(entry.getKey(), getSpeedFromBearing(level, entry.getKey()));
         }
     }
 

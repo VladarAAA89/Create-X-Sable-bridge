@@ -39,12 +39,14 @@ public class SablePhysicsHandler {
         float speedRpm = be.getSpeed();
 
         // 4. Генерируем физический мир Sable
+        BlockPos bearingPos = be.getBlockPos();
+        Direction facing = be.getBlockState().getValue(BlockStateProperties.FACING);
+
         MechanicalBearingBlockEntitySubLevelBridge.createBearingSubLevel(
-                level, anchorPos, axis, sableBlocks, speedRpm
-        );
+                level, bearingPos, facing, sableBlocks, be.getSpeed());
 
         // 5. ОЧЕНЬ ВАЖНО: Удаляем реальные блоки из мира Minecraft,
         // чтобы они не дублировались с физическим объектом Sable.
-        bearing.removeBlocksFromWorld(level, BlockPos.ZERO);
+        //bearing.removeBlocksFromWorld(level, BlockPos.ZERO);
     }
 }
