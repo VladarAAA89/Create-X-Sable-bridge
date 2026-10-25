@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = MechanicalBearingBlockEntity.class, remap = false)
 public abstract class MixinMechanicalBearing {
 
-    // Имена полей взяты из исходника Create, которым ты делился
     @Shadow protected boolean running;
     @Shadow protected float angle;
     @Shadow protected boolean assembleNextTick;
@@ -48,13 +47,4 @@ public abstract class MixinMechanicalBearing {
             ci.cancel();
         }
     }
-
-//    @Inject(method = "onSpeedChanged", at = @At("HEAD"))
-//    private void createsable$onSpeedChanged(float prevSpeed, CallbackInfo ci) {
-//        MechanicalBearingBlockEntity be = (MechanicalBearingBlockEntity) (Object) this;
-//        if (be.getLevel() instanceof ServerLevel level) {
-//            MechanicalBearingBlockEntitySubLevelBridge.updateVelocityByPos(
-//                    level, be.getBlockPos(), be.getSpeed());
-//        }
-//    }
 }

@@ -275,14 +275,6 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         BearingSavedData savedData = BearingSavedData.get(level);
         if (savedData == null) return;
 
-//        for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> entry : savedData.bearings.entrySet()) {
-//            ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.getValue().subLevelId());
-//            if (subLevel != null && !subLevel.isRemoved()) {
-//                float currentSpeed = getSpeedFromBearing(level, entry.getKey());
-//                updateVelocity(subLevel, entry.getValue().axis(), currentSpeed);
-//            }
-//        }
-
         for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> entry : savedData.bearings.entrySet()) {
             driveBearing(entry.getKey(), getSpeedFromBearing(level, entry.getKey()));
         }

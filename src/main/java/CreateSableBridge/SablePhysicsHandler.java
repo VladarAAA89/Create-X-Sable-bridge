@@ -44,9 +44,5 @@ public class SablePhysicsHandler {
 
         MechanicalBearingBlockEntitySubLevelBridge.createBearingSubLevel(
                 level, bearingPos, facing, sableBlocks, be.getSpeed());
-
-        // 5. ОЧЕНЬ ВАЖНО: Удаляем реальные блоки из мира Minecraft,
-        // чтобы они не дублировались с физическим объектом Sable.
-        //bearing.removeBlocksFromWorld(level, BlockPos.ZERO);
     }
 }
