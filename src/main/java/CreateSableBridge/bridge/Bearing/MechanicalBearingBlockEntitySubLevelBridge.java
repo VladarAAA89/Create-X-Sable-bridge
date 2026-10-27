@@ -3,6 +3,7 @@ package CreateSableBridge.bridge.Bearing;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintHandle;
+import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.ticket.SubLevelLoadingTicketType;
@@ -12,12 +13,14 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -134,14 +137,23 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         }
     }
 
-    public static void driveBearing(BlockPos bearingPos, float speedRpm) {
-        RotaryConstraintHandle h = constraintHandles.get(bearingPos);
-        if (h == null || !h.isValid()) return;
+    private static void spinAbout(ServerSubLevel subLevel, Direction facing, float speedRpm) {
+        RigidBodyHandle body = RigidBodyHandle.of(subLevel);
+        if (body == null || !body.isValid()) return;
 
-        double omega = speedRpm * Math.PI / 30.0;                 // рад/с
-        double target = targetAngles.merge(bearingPos, omega / 20.0, Double::sum); // тик = 1/20 с
+        Direction.Axis a = facing.getAxis();
+        Vector3d axis = new Vector3d(
+                a == Direction.Axis.X ? 1 : 0,
+                a == Direction.Axis.Y ? 1 : 0,
+                a == Direction.Axis.Z ? 1 : 0);
 
-        h.setMotor(RotaryConstraintHandle.DEFAULT_AXIS, target, STIFFNESS, DAMPING, false, 0.0);
+        double target = speedRpm * Math.PI / 30.0;   // рад/с
+
+        Vector3d current = body.getAngularVelocity(new Vector3d());
+        double delta = target - current.dot(axis);
+        if (Math.abs(delta) < 1e-4) return;
+
+        body.addLinearAndAngularVelocity(new Vector3d(), axis.mul(delta));
     }
 
     public static void removeBearingSubLevel(ServerLevel level, BlockPos bearingPos) {
@@ -276,7 +288,9 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         if (savedData == null) return;
 
         for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> entry : savedData.bearings.entrySet()) {
-            driveBearing(entry.getKey(), getSpeedFromBearing(level, entry.getKey()));
+            ServerSubLevel sl = (ServerSubLevel) container.getSubLevel(entry.getValue().subLevelId());
+            if (sl == null || sl.isRemoved()) continue;
+            spinAbout(sl, entry.getValue().axis(), getSpeedFromBearing(level, entry.getKey()));
         }
     }
 

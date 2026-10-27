@@ -1,9 +1,7 @@
 package CreateSableBridge.mixin;
 
 import CreateSableBridge.SableAssemblyHandler;
-import CreateSableBridge.bridge.Bearing.MechanicalBearingBlockEntitySubLevelBridge;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
-import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;

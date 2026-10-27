@@ -67,8 +67,6 @@ public class SableAssemblyHandler {
         return false;
     }
 
-    // В классе SableAssemblyHandler.java добавьте
-
     public static boolean isSableControlled(BlockEntity be) {
         if (be.getLevel() == null || be.getLevel().isClientSide()) return false;
         BearingSavedData savedData = BearingSavedData.get((ServerLevel) be.getLevel());
