@@ -3,15 +3,16 @@ package CreateSableBridge;
 import CreateSableBridge.bridge.Bearing.MechanicalBearingBlockEntitySubLevelBridge;
 import com.simibubi.create.content.contraptions.bearing.BearingContraption;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
+import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.AABB;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class SablePhysicsHandler {
 
@@ -41,8 +42,36 @@ public class SablePhysicsHandler {
         // 4. Генерируем физический мир Sable
         BlockPos bearingPos = be.getBlockPos();
         Direction facing = be.getBlockState().getValue(BlockStateProperties.FACING);
+        BlockPos anchorBlock = bearingPos.relative(facing);
+
+        List<SuperGlueEntity> glue = findGlue(level, sableBlocks.keySet());
+        List<AABB> glueBoxes = new ArrayList<>();
+        for (SuperGlueEntity g : glue)
+            glueBoxes.add(g.getBoundingBox().move(-anchorBlock.getX(), -anchorBlock.getY(), -anchorBlock.getZ()));
 
         MechanicalBearingBlockEntitySubLevelBridge.createBearingSubLevel(
-                level, bearingPos, facing, sableBlocks, be.getSpeed());
+                level, bearingPos, facing, sableBlocks, be.getSpeed(), glueBoxes);
+
+        for (SuperGlueEntity g : glue) g.discard();
+    }
+
+    private static List<SuperGlueEntity> findGlue(ServerLevel level, Set<BlockPos> blocks) {
+        List<SuperGlueEntity> result = new ArrayList<>();
+        AABB area = null;
+        for (BlockPos p : blocks) {
+            AABB cell = new AABB(p);
+            area = area == null ? cell : area.minmax(cell);
+        }
+        if (area == null) return result;
+
+        for (SuperGlueEntity g : level.getEntitiesOfClass(SuperGlueEntity.class, area.inflate(1))) {
+            AABB b = g.getBoundingBox().deflate(0.1);
+            for (BlockPos p : BlockPos.betweenClosed(
+                    BlockPos.containing(b.minX, b.minY, b.minZ),
+                    BlockPos.containing(b.maxX, b.maxY, b.maxZ))) {
+                if (blocks.contains(p)) { result.add(g); break; }
+            }
+        }
+        return result;
     }
 }

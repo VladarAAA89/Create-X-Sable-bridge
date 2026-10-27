@@ -1,5 +1,8 @@
 package CreateSableBridge.bridge.Bearing;
 
+import com.simibubi.create.api.contraption.BlockMovementChecks;
+import com.simibubi.create.content.contraptions.StructureTransform;
+import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintHandle;
@@ -16,6 +19,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -24,6 +29,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.joml.Vector3d;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +48,8 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
             BlockPos bearingPos,
             Direction rotationAxis,
             Map<BlockPos, BlockState> blocks,
-            float speedRpm
+            float speedRpm,
+            List<AABB> glueBoxes
     ) {
         if (blocks == null || blocks.isEmpty()) {
             throw new IllegalArgumentException("Cannot assemble an empty block map");
@@ -90,7 +97,7 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         activeSubLevels.put(bearingPos, subLevelId);
 
         BearingSavedData savedData = BearingSavedData.get(level);
-        savedData.bearings.put(bearingPos, new BearingSavedData.BearingEntry(subLevelId, rotationAxis));
+        savedData.bearings.put(bearingPos, new BearingSavedData.BearingEntry(subLevelId, rotationAxis, glueBoxes));
         savedData.setDirty();
 
         ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
@@ -148,74 +155,97 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         BearingSavedData savedData = BearingSavedData.get(level);
         if (savedData == null) return;
 
-        BearingSavedData.BearingEntry entry = savedData.bearings.remove(bearingPos);
-
+        BlockPos key = bearingPos;
+        BearingSavedData.BearingEntry entry = savedData.bearings.remove(key);
         if (entry == null) {
-            BlockPos foundKey = null;
             for (BlockPos storedPos : savedData.bearings.keySet()) {
-                if (storedPos.closerThan(bearingPos, 1.5)) {
-                    foundKey = storedPos;
-                    break;
-                }
+                if (storedPos.closerThan(bearingPos, 1.5)) { key = storedPos; break; }
             }
-            if (foundKey != null) {
-                entry = savedData.bearings.remove(foundKey);
-            }
+            entry = savedData.bearings.remove(key);
         }
-
         savedData.setDirty();
         if (entry == null) return;
 
+        RotaryConstraintHandle h = constraintHandles.remove(key);
+        if (h != null && h.isValid()) h.remove();
+        activeSubLevels.remove(key);
+
         ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
         if (container == null) return;
-
         ServerSubLevel subLevel = (ServerSubLevel) container.getSubLevel(entry.subLevelId());
+        if (subLevel == null || subLevel.isRemoved()) return;
 
-        // --- ВОТ ЗДЕСЬ ИСПОЛЬЗУЕТСЯ МАРКИРОВКА ---
-        if (subLevel != null && !subLevel.isRemoved()) {
-            Map<BlockPos, BlockState> currentSubLevelBlocks = extractBlocksFromSubLevel(subLevel);
+        Direction facing = entry.axis();
+        Direction.Axis axis = facing.getAxis();
+        BlockPos anchorPos = key.relative(facing);
 
-            // 1. Помечаем саб-уровень как удаленный
-            subLevel.markRemoved();
+        // реальный угол и ближайший кратный 90°
+        double theta = twistAngle(subLevel, axis);
+        float snapDeg = Math.round(Math.toDegrees(theta) / 90.0) * 90f;
+        StructureTransform transform = new StructureTransform(anchorPos,
+                axis == Direction.Axis.X ? snapDeg : 0f,
+                axis == Direction.Axis.Y ? snapDeg : 0f,
+                axis == Direction.Axis.Z ? snapDeg : 0f);
 
-            // 2. Возвращаем блоки в физический мир
-            for (Map.Entry<BlockPos, BlockState> blockEntry : currentSubLevelBlocks.entrySet()) {
-                level.setBlock(blockEntry.getKey(), blockEntry.getValue(), 3);
+        Map<BlockPos, BlockState> result = collectSnapped(subLevel, anchorPos, axis, theta, transform);
+
+        subLevel.markRemoved();
+
+        // сначала обычные блоки, потом хрупкие (факелы, лестницы), чтобы не отваливались
+        for (boolean brittle : new boolean[]{false, true}) {
+            for (Map.Entry<BlockPos, BlockState> e : result.entrySet()) {
+                if (BlockMovementChecks.isBrittle(e.getValue()) == brittle)
+                    level.setBlock(e.getKey(), e.getValue(), 3);
             }
+        }
+
+        // клей возвращаем уже повёрнутым
+        for (AABB box : entry.glue()) {
+            Vec3 c1 = transform.apply(new Vec3(box.minX, box.minY, box.minZ));
+            Vec3 c2 = transform.apply(new Vec3(box.maxX, box.maxY, box.maxZ));
+            level.addFreshEntity(new SuperGlueEntity(level, new AABB(c1, c2)));
         }
     }
 
-    private static Map<BlockPos, BlockState> extractBlocksFromSubLevel(ServerSubLevel subLevel) {
-        Map<BlockPos, BlockState> extractedBlocks = new HashMap<>();
+    /** Поворот вокруг оси (swing-twist), радианы, диапазон (-π, π]. */
+    private static double twistAngle(ServerSubLevel subLevel, Direction.Axis axis) {
+        var q = subLevel.logicalPose().orientation();
+        double s = axis == Direction.Axis.X ? q.x() : axis == Direction.Axis.Y ? q.y() : q.z();
+        double t = 2.0 * Math.atan2(s, q.w());
+        if (t > Math.PI) t -= 2 * Math.PI;
+        if (t < -Math.PI) t += 2 * Math.PI;
+        return t;
+    }
+
+    private static Map<BlockPos, BlockState> collectSnapped(ServerSubLevel subLevel, BlockPos anchorPos,
+                                                            Direction.Axis axis, double theta, StructureTransform transform) {
+        Map<BlockPos, BlockState> out = new HashMap<>();
         ServerLevel subWorld = subLevel.getLevel();
-        if (subWorld == null || subLevel.getPlot() == null) return extractedBlocks;
+        if (subWorld == null || subLevel.getPlot() == null) return out;
+        BoundingBox3ic b = subLevel.getPlot().getBoundingBox();
+        if (b == null) return out;
 
-        BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
-        if (bounds == null) return extractedBlocks;
+        Vector3d pivot = new Vector3d(anchorPos.getX() + 0.5, anchorPos.getY() + 0.5, anchorPos.getZ() + 0.5);
+        double ax = axis == Direction.Axis.X ? 1 : 0;
+        double ay = axis == Direction.Axis.Y ? 1 : 0;
+        double az = axis == Direction.Axis.Z ? 1 : 0;
 
-        for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
-            for (int y = bounds.minY(); y <= bounds.maxY(); y++) {
-                for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
-                    BlockPos plotPos = new BlockPos(x, y, z);
-                    BlockState state = subWorld.getBlockState(plotPos);
+        for (int x = b.minX(); x <= b.maxX(); x++)
+            for (int y = b.minY(); y <= b.maxY(); y++)
+                for (int z = b.minZ(); z <= b.maxZ(); z++) {
+                    BlockState state = subWorld.getBlockState(new BlockPos(x, y, z));
+                    if (state == null || state.isAir()) continue;
 
-                    if (state != null && !state.isAir()) {
-                        Vector3d worldVec = new Vector3d(x + 0.5, y + 0.5, z + 0.5);
-                        subLevel.logicalPose().transformPosition(worldVec);
+                    Vector3d p = new Vector3d(x + 0.5, y + 0.5, z + 0.5);
+                    subLevel.logicalPose().transformPosition(p);                 // где блок сейчас
+                    p.sub(pivot).rotateAxis(-theta, ax, ay, az).add(pivot);      // где был при угле 0
 
-                        BlockPos worldPos = new BlockPos(
-                                (int) Math.floor(worldVec.x),
-                                (int) Math.floor(worldVec.y),
-                                (int) Math.floor(worldVec.z)
-                        );
-                        extractedBlocks.put(worldPos, state);
-                    }
+                    BlockPos original = BlockPos.containing(p.x, p.y, p.z);
+                    BlockPos local = original.subtract(anchorPos);
+                    out.put(transform.apply(local), transform.apply(state));
                 }
-            }
-        }
-        return extractedBlocks;
+        return out;
     }
-
     @SubscribeEvent
     public static void onLevelLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;

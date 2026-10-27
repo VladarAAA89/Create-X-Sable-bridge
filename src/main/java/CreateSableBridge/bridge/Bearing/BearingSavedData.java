@@ -8,17 +8,16 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.AABB;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class BearingSavedData extends SavedData {
     private static final String DATA_NAME = "createsablebridge_bearings";
 
     public final Map<BlockPos, BearingEntry> bearings = new HashMap<>();
 
-    public record BearingEntry(UUID subLevelId, Direction axis) {}
+    public record BearingEntry(UUID subLevelId, Direction axis, List<AABB> glue) {}
 
     public static BearingSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -35,7 +34,14 @@ public class BearingSavedData extends SavedData {
             BlockPos pos = BlockPos.of(entry.getLong("pos"));
             UUID uuid = entry.getUUID("uuid");
             Direction axis = Direction.from3DDataValue(entry.getInt("axis"));
-            data.bearings.put(pos, new BearingEntry(uuid, axis));
+            List<AABB> glue = new ArrayList<>();
+            ListTag gl = entry.getList("Glue", Tag.TAG_COMPOUND);
+            for (int j = 0; j < gl.size(); j++) {
+                CompoundTag g = gl.getCompound(j);
+                glue.add(new AABB(g.getDouble("x1"), g.getDouble("y1"), g.getDouble("z1"),
+                        g.getDouble("x2"), g.getDouble("y2"), g.getDouble("z2")));
+            }
+            data.bearings.put(pos, new BearingEntry(uuid, axis, glue));
         }
         return data;
     }
@@ -48,6 +54,14 @@ public class BearingSavedData extends SavedData {
             c.putLong("pos", entry.getKey().asLong());
             c.putUUID("uuid", entry.getValue().subLevelId());
             c.putInt("axis", entry.getValue().axis().get3DDataValue());
+            ListTag gl = new ListTag();
+            for (AABB b : entry.getValue().glue()) {
+                CompoundTag g = new CompoundTag();
+                g.putDouble("x1", b.minX); g.putDouble("y1", b.minY); g.putDouble("z1", b.minZ);
+                g.putDouble("x2", b.maxX); g.putDouble("y2", b.maxY); g.putDouble("z2", b.maxZ);
+                gl.add(g);
+            }
+            c.put("Glue", gl);
             list.add(c);
         }
         tag.put("Bearings", list);
