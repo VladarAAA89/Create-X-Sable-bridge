@@ -17,7 +17,7 @@ public class BearingSavedData extends SavedData {
 
     public final Map<BlockPos, BearingEntry> bearings = new HashMap<>();
 
-    public record BearingEntry(UUID subLevelId, Direction axis, List<AABB> glue) {}
+    public record BearingEntry(UUID subLevelId, Direction axis) {}
 
     public static BearingSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -41,7 +41,7 @@ public class BearingSavedData extends SavedData {
                 glue.add(new AABB(g.getDouble("x1"), g.getDouble("y1"), g.getDouble("z1"),
                         g.getDouble("x2"), g.getDouble("y2"), g.getDouble("z2")));
             }
-            data.bearings.put(pos, new BearingEntry(uuid, axis, glue));
+            data.bearings.put(pos, new BearingEntry(uuid, axis));
         }
         return data;
     }
@@ -55,13 +55,6 @@ public class BearingSavedData extends SavedData {
             c.putUUID("uuid", entry.getValue().subLevelId());
             c.putInt("axis", entry.getValue().axis().get3DDataValue());
             ListTag gl = new ListTag();
-            for (AABB b : entry.getValue().glue()) {
-                CompoundTag g = new CompoundTag();
-                g.putDouble("x1", b.minX); g.putDouble("y1", b.minY); g.putDouble("z1", b.minZ);
-                g.putDouble("x2", b.maxX); g.putDouble("y2", b.maxY); g.putDouble("z2", b.maxZ);
-                gl.add(g);
-            }
-            c.put("Glue", gl);
             list.add(c);
         }
         tag.put("Bearings", list);
