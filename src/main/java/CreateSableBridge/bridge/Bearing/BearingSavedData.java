@@ -34,13 +34,6 @@ public class BearingSavedData extends SavedData {
             BlockPos pos = BlockPos.of(entry.getLong("pos"));
             UUID uuid = entry.getUUID("uuid");
             Direction axis = Direction.from3DDataValue(entry.getInt("axis"));
-            List<AABB> glue = new ArrayList<>();
-            ListTag gl = entry.getList("Glue", Tag.TAG_COMPOUND);
-            for (int j = 0; j < gl.size(); j++) {
-                CompoundTag g = gl.getCompound(j);
-                glue.add(new AABB(g.getDouble("x1"), g.getDouble("y1"), g.getDouble("z1"),
-                        g.getDouble("x2"), g.getDouble("y2"), g.getDouble("z2")));
-            }
             data.bearings.put(pos, new BearingEntry(uuid, axis));
         }
         return data;
@@ -54,7 +47,6 @@ public class BearingSavedData extends SavedData {
             c.putLong("pos", entry.getKey().asLong());
             c.putUUID("uuid", entry.getValue().subLevelId());
             c.putInt("axis", entry.getValue().axis().get3DDataValue());
-            ListTag gl = new ListTag();
             list.add(c);
         }
         tag.put("Bearings", list);

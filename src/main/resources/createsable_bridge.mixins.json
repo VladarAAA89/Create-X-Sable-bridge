@@ -5,8 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinContraption",
-    "MixinAbstractContraptionEntity",
-    "Bearing.MixinMechanicalBearing"
+    "MixinAbstractContraptionEntity"
   ],
   "client": [
   ],

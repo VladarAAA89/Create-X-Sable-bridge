@@ -1,6 +1,7 @@
 package CreateSableBridge.mixin;
 
 import CreateSableBridge.bridge.Bearing.BearingSavedData;
+import CreateSableBridge.bridge.Bearing.MechanicalBearingBlockEntitySubLevelBridge;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.bearing.BearingContraption;
 import net.minecraft.core.BlockPos;
@@ -13,20 +14,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = AbstractContraptionEntity.class, remap = false)
 public abstract class MixinAbstractContraptionEntity {
 
-    @Inject(method = "<init>*", at = @At("RETURN"))
-    private void createsable$blockVanillaEntity(CallbackInfo ci) {
+    @Inject(method = "disassemble", at = @At("HEAD"))
+    private void createsable$release(CallbackInfo ci) {
         AbstractContraptionEntity self = (AbstractContraptionEntity) (Object) this;
         if (!(self.level() instanceof ServerLevel level)) return;
+        if (!(self.getContraption() instanceof BearingContraption bc)) return;
 
-        // Если это сущность подшипника Create, но мы уже контролируем этот подшипник через Sable
-        if (self.getContraption() instanceof BearingContraption bc) {
-            BlockPos bearingPos = bc.anchor.relative(bc.getFacing().getOpposite());
-            BearingSavedData savedData = BearingSavedData.get(level);
-
-            if (savedData.bearings.containsKey(bearingPos)) {
-                // Уничтожаем энтити Create сразу при рождении, чтобы остался только саб-уровень Sable
-                self.discard();
-            }
-        }
+        BlockPos bearingPos = bc.anchor.relative(bc.getFacing().getOpposite());
+        MechanicalBearingBlockEntitySubLevelBridge.releaseForCreate(level, bearingPos, self);
     }
 }
