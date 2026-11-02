@@ -6,4 +6,5 @@ import net.minecraft.server.level.ServerLevel;
 
 public interface SableContraptionHandler {
     boolean assemble(ServerLevel level, Contraption contraption, BlockPos offset);
+    default void onEntityCreated(ServerLevel level, Contraption contraption) {}
 }

@@ -2,6 +2,7 @@ package CreateSableBridge.mixin;
 
 import CreateSableBridge.Interfaces.SableContraptionHandler;
 import CreateSableBridge.SableContraptionHandlers;
+import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.Contraption;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -38,7 +39,20 @@ public abstract class MixinContraption {
     private void createsable$after(Level world, BlockPos offset, CallbackInfo ci) {
         if (createsable$snap == null) return;
         blocks.clear();
-        blocks.putAll(createsable$snap);   // Create выкинул «несовпавшие» блоки
+        blocks.putAll(createsable$snap);
         createsable$snap = null;
+    }
+
+    @Inject(method = "onEntityCreated", at = @At("RETURN"))
+    private void createsable$entityCreated(AbstractContraptionEntity entity, CallbackInfo ci) {
+        if (!(entity.level() instanceof ServerLevel level)) return;
+        Contraption self = (Contraption) (Object) this;
+        SableContraptionHandler h = SableContraptionHandlers.get(self.getType());
+        if (h == null) return;
+        try {
+            h.onEntityCreated(level, self);
+        } catch (Exception e) {
+            e.printStackTrace();   // не роняем assemble() Create
+        }
     }
 }

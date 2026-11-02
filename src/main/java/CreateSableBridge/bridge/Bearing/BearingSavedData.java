@@ -17,7 +17,7 @@ public class BearingSavedData extends SavedData {
 
     public final Map<BlockPos, BearingEntry> bearings = new HashMap<>();
 
-    public record BearingEntry(UUID subLevelId, Direction axis) {}
+    public record BearingEntry(UUID subLevelId, Direction axis, CompoundTag contraption) {}
 
     public static BearingSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -34,7 +34,7 @@ public class BearingSavedData extends SavedData {
             BlockPos pos = BlockPos.of(entry.getLong("pos"));
             UUID uuid = entry.getUUID("uuid");
             Direction axis = Direction.from3DDataValue(entry.getInt("axis"));
-            data.bearings.put(pos, new BearingEntry(uuid, axis));
+            data.bearings.put(pos, new BearingEntry(uuid, axis, entry.getCompound("Contraption")));
         }
         return data;
     }
@@ -47,6 +47,7 @@ public class BearingSavedData extends SavedData {
             c.putLong("pos", entry.getKey().asLong());
             c.putUUID("uuid", entry.getValue().subLevelId());
             c.putInt("axis", entry.getValue().axis().get3DDataValue());
+            c.put("Contraption", entry.getValue().contraption());
             list.add(c);
         }
         tag.put("Bearings", list);

@@ -34,4 +34,17 @@ public class BearingHandler implements SableContraptionHandler {
             return false;
         }
     }
+    @Override
+    public void onEntityCreated(ServerLevel level, Contraption c) {
+        if (!(c instanceof BearingContraption bc)) return;
+        BlockPos bearingPos = bc.anchor.relative(bc.getFacing().getOpposite());   // у подшипника offset = ZERO
+
+        BearingSavedData saved = BearingSavedData.get(level);
+        BearingSavedData.BearingEntry e = saved.bearings.get(bearingPos);
+        if (e == null || !e.contraption().isEmpty()) return;   // не наш или уже сохранён
+
+        saved.bearings.put(bearingPos, new BearingSavedData.BearingEntry(
+                e.subLevelId(), e.axis(), c.writeNBT(level.registryAccess(), false)));
+        saved.setDirty();
+    }
 }

@@ -1,7 +1,10 @@
 package CreateSableBridge.bridge.Bearing;
 
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
+import com.simibubi.create.content.contraptions.Contraption;
 import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
+import com.simibubi.create.content.contraptions.bearing.BearingContraption;
+import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration;
@@ -15,11 +18,15 @@ import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.joml.Vector3d;
@@ -62,7 +69,7 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
 
         UUID id = subLevel.getUniqueId();
         BearingSavedData saved = BearingSavedData.get(level);
-        saved.bearings.put(bearingPos, new BearingSavedData.BearingEntry(id, facing));
+        saved.bearings.put(bearingPos, new BearingSavedData.BearingEntry(id, facing, new CompoundTag()));
         saved.setDirty();
 
         ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
@@ -128,6 +135,11 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
 
         if (entity instanceof ControlledContraptionEntity cce)
             cce.setAngle((float) Math.toDegrees(twistAngle(sl, e.axis().getAxis())));
+
+        if (entity.getContraption() != null)
+            syncContraptionFromPlot(sl, bearingPos, entity.getContraption());
+        sl.markRemoved();
+
         sl.markRemoved();
     }
 
@@ -163,11 +175,81 @@ public class MechanicalBearingBlockEntitySubLevelBridge {
         ServerSubLevelContainer container = (ServerSubLevelContainer) SubLevelContainer.getContainer(level);
         if (container == null) return;
 
-        for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> en : BearingSavedData.get(level).bearings.entrySet()) {
+        BearingSavedData saved = BearingSavedData.get(level);
+
+        for (Map.Entry<BlockPos, BearingSavedData.BearingEntry> en : saved.bearings.entrySet()) {
+            BlockPos pos = en.getKey();
+            if (!level.isLoaded(pos)) continue;
+
             ServerSubLevel sl = (ServerSubLevel) container.getSubLevel(en.getValue().subLevelId());
             if (sl == null || sl.isRemoved()) continue;
-            float rpm = level.getBlockEntity(en.getKey()) instanceof KineticBlockEntity k ? k.getSpeed() : 0f;
-            spinAbout(sl, en.getValue().axis(), rpm);
+
+            if (!(level.getBlockEntity(pos) instanceof MechanicalBearingBlockEntity mbe)) continue;
+
+            if (mbe.isRunning() && mbe.getMovedContraption() == null
+                    && !en.getValue().contraption().isEmpty())
+                restoreGhost(level, pos, mbe, en.getValue());
+
+            spinAbout(sl, en.getValue().axis(), mbe.getSpeed());
         }
     }
+
+    @SubscribeEvent
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getEntity() instanceof ControlledContraptionEntity cce)) return;
+        if (!(cce.getContraption() instanceof BearingContraption bc)) return;
+
+        BlockPos bearingPos = bc.anchor.relative(bc.getFacing().getOpposite());
+        if (BearingSavedData.get(level).bearings.containsKey(bearingPos))
+            event.setCanceled(true);   // призрак: живёт в памяти, в мир не попадает
+    }
+
+    private static void restoreGhost(ServerLevel level, BlockPos pos, MechanicalBearingBlockEntity mbe,
+                                     BearingSavedData.BearingEntry e) {
+        Contraption contraption = Contraption.fromNBT(level, e.contraption(), false);
+        ControlledContraptionEntity ghost = ControlledContraptionEntity.create(level, mbe, contraption);
+        mbe.attach(ghost);     // сам ставит позицию, running и sendData; в мир призрака не добавляем
+    }
+
+    private static void syncContraptionFromPlot(ServerSubLevel sl, BlockPos bearingPos, Contraption c) {
+        ServerLevel subWorld = sl.getLevel();
+        if (subWorld == null || sl.getPlot() == null || sl.getPlot().getBoundingBox() == null) return;
+        BoundingBox3ic b = sl.getPlot().getBoundingBox();
+
+        // plotPos = local + shift (assembleBlocks получил якорем bearingPos, а центр плота это getCenterBlock)
+        BlockPos shift = c.anchor.subtract(bearingPos).offset(sl.getPlot().getCenterBlock());
+
+        Map<BlockPos, StructureTemplate.StructureBlockInfo> fresh = new HashMap<>();
+        int matched = 0;
+
+        for (int x = b.minX(); x <= b.maxX(); x++)
+            for (int y = b.minY(); y <= b.maxY(); y++)
+                for (int z = b.minZ(); z <= b.maxZ(); z++) {
+                    BlockPos plotPos = new BlockPos(x, y, z);
+                    BlockState st = subWorld.getBlockState(plotPos);
+                    if (st == null || st.isAir()) continue;
+
+                    BlockPos local = plotPos.subtract(shift);
+                    StructureTemplate.StructureBlockInfo old = c.getBlocks().get(local);
+                    if (old != null) matched++;
+
+                    CompoundTag nbt = old == null ? null : old.nbt();
+                    BlockEntity be = subWorld.getBlockEntity(plotPos);
+                    if (be != null) {
+                        nbt = be.saveWithFullMetadata(subWorld.registryAccess());
+                        nbt.remove("x"); nbt.remove("y"); nbt.remove("z");
+                    }
+                    fresh.put(local, new StructureTemplate.StructureBlockInfo(local, st, nbt));
+                }
+
+        CreateSableBridge.CreateSableBridge.LOGGER.info("sync: было={}, в плоте={}, совпало={}",
+                c.getBlocks().size(), fresh.size(), matched);
+
+        if (matched == 0 && !c.getBlocks().isEmpty()) return;   // сдвиг не подошёл, оставляем снимок
+
+        c.getBlocks().clear();
+        c.getBlocks().putAll(fresh);
+    }
+    //и ещё ставить центр тяжести на место блока над bearing, при ломании якорного блока (блока над bearing) логика возвращения ломается - надо разбирать и удалять все блоки с подшипника, а оставшееся отвязывать
 }
